@@ -91,7 +91,7 @@ const initPicker = async () => {
     );
   };
 
-  slider.value.gt(0).monitor().subscribe((event) => {
+  slider.value.gt(0.01).monitor().subscribe((event) => {
     processingEnabled = event.newValue;
     if (event.newValue) {
       savedSliderValue = -1;
