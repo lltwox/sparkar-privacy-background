@@ -6,7 +6,7 @@ const mul = (segmentationTexture, uv) => Reactive.val(1).sub(
   utils.texture2D(segmentationTexture, uv).w.smoothStep(0.5, 0.5)
 );
 
-module.exports = (texture, amount, segmentationTexture) => {
+module.exports = (textures, amount) => {
   const uv = Shaders.functionVec2();
 
   const pixelSize = amount.add(0.1).mul(100);
@@ -34,17 +34,17 @@ module.exports = (texture, amount, segmentationTexture) => {
     tileSizeY.mul(Reactive.ceil(Reactive.div(uv.y, tileSizeY)))
   );
 
-  let colorCenter = utils.texture2D(texture, uvCenter);
-  let colorTopLeft = utils.texture2D(texture, uvTopLeft);
-  let colorTopRight = utils.texture2D(texture, uvTopRight);
-  let colorBottomLeft = utils.texture2D(texture, uvBottomLeft);
-  let colorBottomRight = utils.texture2D(texture, uvBottomRight);
+  let colorCenter = utils.texture2D(textures.camera, uvCenter);
+  let colorTopLeft = utils.texture2D(textures.camera, uvTopLeft);
+  let colorTopRight = utils.texture2D(textures.camera, uvTopRight);
+  let colorBottomLeft = utils.texture2D(textures.camera, uvBottomLeft);
+  let colorBottomRight = utils.texture2D(textures.camera, uvBottomRight);
 
-  let mulCenter = mul(segmentationTexture, uvCenter);
-  let mulTopLeft = mul(segmentationTexture, uvTopLeft);
-  let mulTopRight = mul(segmentationTexture, uvTopRight);
-  let mulBottomLeft = mul(segmentationTexture, uvBottomLeft);
-  let mulBottomRight = mul(segmentationTexture, uvBottomRight);
+  let mulCenter = mul(textures.segmentation, uvCenter);
+  let mulTopLeft = mul(textures.segmentation, uvTopLeft);
+  let mulTopRight = mul(textures.segmentation, uvTopRight);
+  let mulBottomLeft = mul(textures.segmentation, uvBottomLeft);
+  let mulBottomRight = mul(textures.segmentation, uvBottomRight);
 
   return colorCenter.mul(mulCenter)
     .add(

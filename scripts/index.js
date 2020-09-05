@@ -21,7 +21,7 @@ const BG_PROCESSORS = [
 ];
 
 const DEFAULT_SLIDER_VALUE = 0.5;
-const DEFAULT_INDEX = 1;
+const DEFAULT_INDEX = 0;
 
 const initSlider = () => {
   const slider = NativeUI.slider;
@@ -62,8 +62,16 @@ const initPicker = async () => {
 }
 
 (async () => {
-  const cameraTexture = (await Textures.findFirst('camera')).signal;
-  const segmentationTexture = (await Textures.findFirst('segmentationMask')).signal;
+  const [cameraTexture, segmentationTexture, noiseTexture] = await Promise.all([
+    Textures.findFirst('camera'),
+    Textures.findFirst('segmentationMask'),
+    Textures.findFirst('noise'),
+  ]);
+  const textures = {
+    camera: cameraTexture.signal,
+    segmentation: segmentationTexture.signal,
+    noise: noiseTexture.signal
+  }
   const bgMaterial = await Materials.findFirst('background');
   const slider = await initSlider();
   const picker = await initPicker();
@@ -73,8 +81,8 @@ const initPicker = async () => {
   let selectedIndex = DEFAULT_INDEX;
   const updateBg = () => {
     let img = processingEnabled
-      ? BG_PROCESSORS[selectedIndex](cameraTexture, slider.value, segmentationTexture)
-      : cameraTexture
+      ? BG_PROCESSORS[selectedIndex](textures, slider.value)
+      : textures.camera
     ;
 
     bgMaterial.setTextureSlot(

@@ -2,7 +2,6 @@ const Shaders = require('Shaders'),
       Reactive = require('Reactive'),
       utils = require('./utils');
 
-const DOWNSAMPLE = 32;
 const SIZE = 2;
 const WEIGHT = 1 / (SIZE * 2);
 
@@ -25,34 +24,6 @@ const blur = (color, amount) => {
   return color;
 };
 
-const interpolate = (color, amount) => {
-  const uv = Shaders.functionVec2();
-
-  const x = Reactive.floor(Reactive.mul(uv.x, utils.RESOLUTION.x));
-  const y = Reactive.floor(Reactive.mul(uv.y, utils.RESOLUTION.y));
-
-  const xBase = x.div(amount);
-  const x1 = xBase.floor().mul(amount).div(utils.RESOLUTION.x);
-  const x2 = xBase.ceil().mul(amount).div(utils.RESOLUTION.x);
-
-  const yBase = y.div(amount);
-  const y1 = yBase.floor().mul(amount).div(utils.RESOLUTION.y);
-  const y2 = yBase.ceil().mul(amount).div(utils.RESOLUTION.y);
-
-  let colorY1 = Reactive.mix(
-    utils.texture2D(color, Reactive.pack2(x1, y1)),
-    utils.texture2D(color, Reactive.pack2(x2, y1)),
-    xBase.mod(1)
-  );
-  let colorY2 = Reactive.mix(
-    utils.texture2D(color, Reactive.pack2(x1, y2)),
-    utils.texture2D(color, Reactive.pack2(x2, y2)),
-    xBase.mod(1)
-  );
-
-  return Reactive.mix(colorY1, colorY2, yBase.mod(1));
-};
-
 const s = Reactive.val(0.5);
 const cubic = (x) => {
   const x2 = x.mul(x);
@@ -69,35 +40,20 @@ const cubic = (x) => {
 const interpolateCubic = (color, amount) => {
   const uv = Shaders.functionVec2();
 
-  // uv = (0.46, 0.39)
-  // RESOLUTION = (300, 200)
+  const x = Reactive.mul(uv.x, utils.RESOLUTION.x).div(amount);
+  const y = Reactive.mul(uv.y, utils.RESOLUTION.y).div(amount);
 
-  // let x = Reactive.floor(Reactive.mul(uv.x, utils.RESOLUTION.x));
-  // let y = Reactive.floor(Reactive.mul(uv.y, utils.RESOLUTION.y));
+  const fx = x.mod(1);
+  const fy = y.mod(1);
 
-  // // x = 138
-  // // y = 78
-
-  // const fx = x.div(amount).mod(1); // fx = (138 / 4) % 1 = 34.5 % 1 = 0.5
-  // const fy = y.div(amount).mod(1); // fy = (78 / 4) % 1 = 19.5
-  // x = x.sub(fx);
-  // y = y.sub(fy);
-
-  let x = Reactive.mul(uv.x, utils.RESOLUTION.x);
-  let y = Reactive.mul(uv.y, utils.RESOLUTION.y);
-
-  // x = 138
-  // y = 78
-
-  const fx = x.mod(1); // fx = (138 / 4) % 1 = 34.5 % 1 = 0.5
-  const fy = y.mod(1); // fy = (78 / 4) % 1 = 19.5
-  x = x.sub(fx);
-  y = y.sub(fy);
+  const xInt = x.sub(fx);
+  const yInt = y.sub(fy);
 
   const xCubic = cubic(fx);
   const yCubic = cubic(fy);
 
-  const c = Reactive.pack4(x.sub(0.5), x.add(1.5), y.sub(0.5), y.add(1.5));
+  const c = Reactive.pack4(xInt.sub(0.5), xInt.add(1.5), yInt.sub(0.5), yInt.add(1.5));
+
   const s = Reactive.pack4(
     xCubic.x.add(xCubic.y),
     xCubic.z.add(xCubic.w),
@@ -108,10 +64,22 @@ const interpolateCubic = (color, amount) => {
     Reactive.pack4(xCubic.y, xCubic.w, yCubic.y, yCubic.w).div(s)
   );
 
-  const sample0 = utils.texture2D(color, Reactive.pack2(offset.x, offset.z).mul(amount));
-  const sample1 = utils.texture2D(color, Reactive.pack2(offset.y, offset.z).mul(amount));
-  const sample2 = utils.texture2D(color, Reactive.pack2(offset.x, offset.w).mul(amount));
-  const sample3 = utils.texture2D(color, Reactive.pack2(offset.y, offset.w).mul(amount));
+  const sample0 = utils.texture2D(color, Reactive.pack2(
+    Reactive.round(offset.x.mul(amount)).div(utils.RESOLUTION.x),
+    Reactive.round(offset.z.mul(amount)).div(utils.RESOLUTION.y)
+  ));
+  const sample1 = utils.texture2D(color, Reactive.pack2(
+    Reactive.round(offset.y.mul(amount)).div(utils.RESOLUTION.x),
+    Reactive.round(offset.z.mul(amount)).div(utils.RESOLUTION.y)
+  ));
+  const sample2 = utils.texture2D(color, Reactive.pack2(
+    Reactive.round(offset.x.mul(amount)).div(utils.RESOLUTION.x),
+    Reactive.round(offset.w.mul(amount)).div(utils.RESOLUTION.y)
+  ));
+  const sample3 = utils.texture2D(color, Reactive.pack2(
+    Reactive.round(offset.y.mul(amount)).div(utils.RESOLUTION.x),
+    Reactive.round(offset.w.mul(amount)).div(utils.RESOLUTION.y)
+  ));
 
   const sx = s.x.div(Reactive.add(s.x, s.y));
   const sy = s.z.div(Reactive.add(s.z, s.w));
@@ -123,14 +91,10 @@ const interpolateCubic = (color, amount) => {
   );
 }
 
-module.exports = (texture, amount) => {
-  amount = amount.mul(4);
-
+module.exports = (textures, amount) => {
   const uv = Shaders.functionVec2();
-  const color = utils.texture2D(texture, uv);
+  const colorBlurred = blur(utils.texture2D(textures.camera, uv), amount.mul(30));
 
-  // const colorBlurred = blur(color, amount.mul(amount.mul(8)));
-  // return interpolate(color, amount.mul(20));
-  return interpolateCubic(color, Reactive.val(4));
+  return interpolateCubic(colorBlurred, amount.mul(50));
 }
 
